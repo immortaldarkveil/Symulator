@@ -1,1 +1,1 @@
-# Symulator
+Symbiotic.fi simulator 
