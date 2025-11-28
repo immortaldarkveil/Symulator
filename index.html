@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staking Master - Symbiotic Game</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Header: Single Source of Truth Display -->
+    <div class="header">
+        <h1>🔗 Staking Master</h1>
+        <div class="game-stats">
+            <div class="stat">
+                <span class="label">Capital:</span>
+                <span id="capital">$10,000</span>
+            </div>
+            <div class="stat">
+                <span class="label">Round:</span>
+                <span id="round">1</span>
+            </div>
+            <div class="stat">
+                <span class="label">Total Earnings:</span>
+                <span id="earnings">$0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Game Area: LEGO Block Container -->
+    <div class="game-area">
+        <div class="networks-grid" id="networksGrid">
+            <!-- LEGO Blocks: Network cards will be inserted here -->
+        </div>
+
+        <div class="controls">
+            <button id="startRound" class="btn">Start Next Round</button>
+            <button id="resetGame" class="btn">Reset Game</button>
+            <button id="becomeOperatorBtn" class="btn operator-btn">Register as Operator</button>
+        </div>
+
+        <!-- Operator Dashboard: Hidden by default -->
+        <div id="operatorDashboard" class="operator-dashboard" style="display: none;">
+            <h3>⭐ Operator Dashboard</h3>
+            <div class="operator-stats">
+                <div class="stat">
+                    <span class="label">Name:</span>
+                    <span id="opName"></span>
+                </div>
+                <div class="stat">
+                    <span class="label">Trust Score:</span>
+                    <span id="opTrustScore"></span>
+                </div>
+                <div class="stat">
+                    <span class="label">Tasks Completed:</span>
+                    <span id="opTasks"></span>
+                </div>
+                <div class="stat">
+                    <span class="label">Liveness:</span>
+                    <span id="opLiveness"></span>%
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Events Log: Data Flow End Point -->
+    <div class="events-log">
+        <h3>🎯 Game Events</h3>
+        <div id="eventsLog">
+            <div class="event">Welcome to Staking Master! Click on any network to stake your capital.</div>
+        </div>
+    </div>
+
+    <!-- Modal: Interaction Block -->
+    <div id="stakeModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle">Stake in Network</h2>
+            <div id="modalBody">
+                <!-- Dynamic content will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Load JavaScript at end for performance -->
+    <script src="game.js"></script>
+</body>
+</html>
