@@ -2,62 +2,79 @@
 const gameState = {
     player: {
         capital: 10000,
-        isStaker: true,    // The player will always be a staker
-        isOperator: false, // The player can CHOOSE to become an operator later
-        operatorId: null   // If they become an operator, we'll track it here
+        isStaker: true,
+        isOperator: false,
+        operatorId: null
     },
-    operators: [], // A list of all operators in the game. Initially empty.
+    operators: [],
+    vaults: [
+        {
+            id: 'vault-01',
+            name: 'Symbiotic Shared Security Vault',
+            type: 'Curated',
+            tvl: 0,
+            description: 'A balanced portfolio of high-trust networks, curated by the Symbiotic Foundation.'
+        },
+        {
+            id: 'vault-02',
+            name: 'High-Yield Operator Vault',
+            type: 'OperatorSpecific',
+            operatorId: 'op-ai-1', // Example placeholder
+            tvl: 0,
+            description: 'A high-risk, high-reward vault run by a single, aggressive operator.'
+        }
+    ],
+    deposits: [], // Replaces the 'stakes' array
     round: 1,
     totalEarnings: 0,
-    stakes: [], // Active stakes
     networks: [
         {
             id: 'ethereum',
             name: 'Ethereum Network',
-            trustScore: 95, // A score from 0-100 representing trustworthiness
-            apy: 0.08, // 8% annual
-            lockPeriod: 2, // rounds
-            description: 'The largest smart contract platform'
+            trustScore: 95,
+            apy: 0.08,
+            targetStake: 20000,
+            currentStake: 0
         },
         {
             id: 'polygon',
             name: 'Polygon POS',
             trustScore: 92,
-            apy: 0.05, // 5% annual
-            lockPeriod: 1, // rounds
-            description: 'Fast, low-cost Ethereum sidechain'
+            apy: 0.05,
+            targetStake: 15000,
+            currentStake: 0
         },
         {
             id: 'avalanche',
             name: 'Avalanche',
             trustScore: 88,
-            apy: 0.12, // 12% annual
-            lockPeriod: 3, // rounds
-            description: 'High-performance blockchain with sub-second finality'
+            apy: 0.12,
+            targetStake: 10000,
+            currentStake: 0
         },
         {
             id: 'arbitrum',
             name: 'Arbitrum One',
             trustScore: 90,
-            apy: 0.07, // 7% annual
-            lockPeriod: 2, // rounds
-            description: 'Leading Ethereum Layer 2 solution'
+            apy: 0.07,
+            targetStake: 12000,
+            currentStake: 0
         },
         {
             id: 'solana',
             name: 'Solana',
             trustScore: 85,
-            apy: 0.15, // 15% annual
-            lockPeriod: 4, // rounds
-            description: 'Ultra-fast blockchain with massive throughput'
+            apy: 0.15,
+            targetStake: 8000,
+            currentStake: 0
         },
         {
             id: 'chainlink',
             name: 'Chainlink',
             trustScore: 98,
-            apy: 0.06, // 6% annual
-            lockPeriod: 2, // rounds
-            description: 'Decentralized oracle network'
+            apy: 0.06,
+            targetStake: 18000,
+            currentStake: 0
         }
     ]
 };
@@ -112,18 +129,16 @@ function getRiskCategory(trustScore) {
     return 'high';
 }
 
-// LEGO BLOCK 3: Network Card Factory (Pattern Reuse)
-function renderNetworks() {
+// LEGO BLOCK 3: Vault Card Factory (Pattern Reuse)
+function renderVaults() {
     // Single innerHTML call = More efficient than multiple DOM operations
-    elements.networksGrid.innerHTML = gameState.networks.map(network => {
-        const riskCategory = getRiskCategory(network.trustScore);
+    elements.networksGrid.innerHTML = gameState.vaults.map(vault => {
         return `
-        <div class="network-card" onclick="openStakeModal('${network.id}')">
-            <div class="network-name">${network.name}</div>
-            <div>Trust Score: <span class="risk-${riskCategory}">${network.trustScore}</span></div>
-            <div>APY: ${(network.apy * 100).toFixed(1)}%</div>
-            <div>Lock Period: ${network.lockPeriod} rounds</div>
-            <div style="margin-top: 10px; font-size: 14px; opacity: 0.8;">${network.description}</div>
+        <div class="network-card" onclick="openDepositModal('${vault.id}')">
+            <div class="network-name">${vault.name}</div>
+            <div>Type: <span class="risk-${vault.type === 'Curated' ? 'low' : 'high'}">${vault.type}</span></div>
+            <div>TVL: $${vault.tvl.toLocaleString()}</div>
+            <div style="margin-top: 10px; font-size: 14px; opacity: 0.8;">${vault.description}</div>
         </div>
     `}).join('');
 }
@@ -143,153 +158,189 @@ function addEvent(message) {
 }
 
 // LEGO BLOCK 5: Modal System (Interaction Handler)
-function openStakeModal(networkId) {
-    const network = gameState.networks.find(n => n.id === networkId);
-    const existingStake = gameState.stakes.find(s => s.networkId === networkId);
-    const riskCategory = getRiskCategory(network.trustScore);
+function openDepositModal(vaultId) {
+    const vault = gameState.vaults.find(v => v.id === vaultId);
+    const existingDeposit = gameState.deposits.find(d => d.vaultId === vaultId);
 
-    elements.modalTitle.textContent = `Stake in ${network.name}`;
+    // Simplified: Get underlying networks to display their status
+    const underlyingNetworkIds = vault.type === 'Curated' 
+        ? ['ethereum', 'chainlink']
+        : ['solana', 'avalanche'];
+    const networkDetails = underlyingNetworkIds.map(id => {
+        const network = gameState.networks.find(n => n.id === id);
+        const isOverStaked = network.currentStake > network.targetStake;
+        return `
+            <div style="padding-left: 10px; margin-bottom: 5px;">
+                <strong>${network.name}:</strong> 
+                $${Math.round(network.currentStake).toLocaleString()} / $${network.targetStake.toLocaleString()}
+                ${isOverStaked ? `<span class="risk-high" style="font-size: 12px; padding: 2px 4px; border-radius: 3px; margin-left: 5px;">OVER-STAKED</span>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    elements.modalTitle.textContent = `Deposit in ${vault.name}`;
     elements.modalBody.innerHTML = `
-        <div style="margin-bottom: 15px;">${network.description}</div>
+        <div style="margin-bottom: 15px;">${vault.description}</div>
         <div style="margin-bottom: 15px;">
-            <div>APY: ${(network.apy * 100).toFixed(1)}%</div>
-            <div>Trust Score: <span class="risk-${riskCategory}">${network.trustScore}</span></div>
-            <div>Lock Period: ${network.lockPeriod} rounds</div>
+            <div>Type: ${vault.type}</div>
+            <div>TVL: $${vault.tvl.toLocaleString()}</div>
         </div>
-        ${existingStake ? `
+        <div style="margin-bottom: 15px;">
+            <strong>Underlying Network Status:</strong>
+            ${networkDetails}
+        </div>
+        ${existingDeposit ? `
             <div style="background: #0f3460; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-                <strong>Current Stake:</strong> $${existingStake.amount.toLocaleString()}<br>
-                <strong>Rounds Remaining:</strong> ${existingStake.roundsRemaining}
+                <strong>Your Current Deposit:</strong> $${existingDeposit.amount.toLocaleString()}
             </div>
         ` : ''}
-        <input type="number" id="stakeAmount" class="stake-input" placeholder="Enter amount to stake ($)" max="${gameState.player.capital}" min="1">
+        <input type="number" id="depositAmount" class="stake-input" placeholder="Enter amount to deposit ($)" max="${gameState.player.capital}" min="1">
         <div style="margin-top: 15px;">
             <strong>Available Capital:</strong> $${gameState.player.capital.toLocaleString()}
         </div>
-        <button onclick="placeStake('${networkId}')" class="btn" style="margin-top: 15px; width: 100%;">
-            ${existingStake ? 'Add to Stake' : 'Place Stake'}
+        <button onclick="makeDeposit('${vaultId}')" class="btn" style="margin-top: 15px; width: 100%;">
+            ${existingDeposit ? 'Add to Deposit' : 'Make Deposit'}
         </button>
     `;
 
     elements.stakeModal.style.display = 'block';
 }
 
-// LEGO BLOCK 6: Staking Logic (Game State Changer)
-function placeStake(networkId) {
-    const amount = parseInt(document.getElementById('stakeAmount').value);
-    const network = gameState.networks.find(n => n.id === networkId);
+// LEGO BLOCK 6: Deposit Logic (Game State Changer)
+function makeDeposit(vaultId) {
+    const amount = parseInt(document.getElementById('depositAmount').value);
+    const vault = gameState.vaults.find(v => v.id === vaultId);
 
-    // Validation: Error Boundary Pattern
+    // Validation
     if (!amount || amount <= 0) {
         alert('Please enter a valid amount');
         return;
     }
-
     if (amount > gameState.player.capital) {
         alert('Insufficient capital!');
         return;
     }
 
-    // Update Single Source of Truth
+    // Update State
     gameState.player.capital -= amount;
+    vault.tvl += amount;
 
-    // Add or update stake
-    const existingStake = gameState.stakes.find(s => s.networkId === networkId);
-    if (existingStake) {
-        existingStake.amount += amount;
+    const existingDeposit = gameState.deposits.find(d => d.vaultId === vaultId);
+    if (existingDeposit) {
+        existingDeposit.amount += amount;
     } else {
-        gameState.stakes.push({
-            networkId: networkId,
+        gameState.deposits.push({
+            vaultId: vaultId,
             amount: amount,
-            roundsRemaining: network.lockPeriod,
-            initialAmount: amount
+            // We'll add more properties like lock periods later
         });
     }
 
-    addEvent(`Staked $${amount.toLocaleString()} in ${network.name}`);
-    updateUI(); // UI follows data (Data Flow Pattern)
+    addEvent(`Deposited $${amount.toLocaleString()} in ${vault.name}`);
+    updateUI();
+    renderVaults(); // Re-render vaults to show new TVL
     elements.stakeModal.style.display = 'none';
+}
+
+// NEW LEGO BLOCK: Delegator Logic
+function updateNetworkDelegations() {
+    // 1. Reset current stake for all networks
+    gameState.networks.forEach(network => {
+        network.currentStake = 0;
+    });
+
+    // 2. Distribute vault TVL to networks
+    gameState.vaults.forEach(vault => {
+        if (vault.tvl > 0) {
+            // Simplified: Assume each vault uses a predefined set of networks.
+            const underlyingNetworkIds = vault.type === 'Curated' 
+                ? ['ethereum', 'chainlink'] // Safe, curated vault
+                : ['solana', 'avalanche'];   // High-risk, operator vault
+            
+            const stakePerNetwork = vault.tvl / underlyingNetworkIds.length;
+
+            underlyingNetworkIds.forEach(networkId => {
+                const network = gameState.networks.find(n => n.id === networkId);
+                if (network) {
+                    network.currentStake += stakePerNetwork;
+                }
+            });
+        }
+    });
 }
 
 // LEGO BLOCK 7: Round Processing (State Machine)
 function processRound() {
     let totalRewards = 0;
 
-    // Process each stake (component thinking)
-    gameState.stakes.forEach(stake => {
-        const network = gameState.networks.find(n => n.id === stake.networkId);
-        
-        // Base reward calculation
-        const baseReward = stake.amount * network.apy / 12;
-        let finalReward = baseReward;
+    gameState.deposits.forEach(deposit => {
+        const vault = gameState.vaults.find(v => v.id === deposit.vaultId);
+        if (!vault) return;
 
-        // Trust Score determines event probability and outcome
-        const safetyMargin = network.trustScore / 100; // e.g., 0.95 for a score of 95
-        const isSafeEvent = Math.random() < safetyMargin;
+        const underlyingNetworkIds = vault.type === 'Curated' 
+            ? ['ethereum', 'chainlink']
+            : ['solana', 'avalanche'];
 
-        if (isSafeEvent) {
-            // Network is performing as expected. Small bonus possible.
-            const bonusMultiplier = 1 + (Math.random() * 0.05); // Up to 5% bonus
-            finalReward *= bonusMultiplier;
-            if (bonusMultiplier > 1.01) {
-                 addEvent(`${network.name}: Stable performance. Earned a small bonus.`);
+        let vaultReward = 0;
+        underlyingNetworkIds.forEach(networkId => {
+            const network = gameState.networks.find(n => n.id === networkId);
+            if (!network) return;
+
+            // --- MINING RATE LOGIC ---
+            let miningRate = 1.0;
+            if (network.currentStake > network.targetStake) {
+                miningRate = network.targetStake / network.currentStake;
+                addEvent(`${network.name} is over-staked! Reward rate reduced by ${((1 - miningRate) * 100).toFixed(0)}%.`);
             }
-        } else {
-            // Unsafe event! Potential for a slashing penalty.
-            // The lower the trust score, the harsher the penalty can be.
-            const penaltySeverity = (100 - network.trustScore) / 100; // e.g., 0.05 for a score of 95
-            const penaltyMultiplier = 1 - (Math.random() * penaltySeverity * 5); // Can be a significant penalty
+            // -------------------------
 
-            finalReward *= penaltyMultiplier;
+            const portionedAmount = deposit.amount / underlyingNetworkIds.length;
+            const baseReward = portionedAmount * network.apy / 12;
+            let finalReward = baseReward * miningRate; // Apply mining rate
 
-            if (penaltyMultiplier < 1) {
-                const penaltyPercent = Math.round((1 - penaltyMultiplier) * 100);
-                addEvent(`🚨 ${network.name}: Network instability! A slashing event occurred, resulting in a ${penaltyPercent}% penalty on rewards.`);
+            const safetyMargin = network.trustScore / 100;
+            if (Math.random() > safetyMargin) {
+                const penaltySeverity = (100 - network.trustScore) / 100;
+                const penaltyMultiplier = 1 - (Math.random() * penaltySeverity * 5);
+                finalReward *= penaltyMultiplier;
+
+                if (penaltyMultiplier < 1) {
+                    const penaltyPercent = Math.round((1 - penaltyMultiplier) * 100);
+                    addEvent(`🚨 Slashing event in ${vault.name} via ${network.name}! A ${penaltyPercent}% penalty was applied.`);
+                }
             }
-        }
+            vaultReward += finalReward;
+        });
         
-        totalRewards += finalReward;
-
-        // Decrease lock period
-        stake.roundsRemaining--;
+        totalRewards += vaultReward;
     });
-
-    // Return completed stakes (Complete investment cycle)
-    const completedStakes = gameState.stakes.filter(s => s.roundsRemaining <= 0);
-    completedStakes.forEach(stake => {
-        gameState.player.capital += stake.amount; // Return principal
-        addEvent(`Stake in ${gameState.networks.find(n => n.id === stake.networkId).name} completed - principal returned`);
-    });
-
-    // Remove completed stakes
-    gameState.stakes = gameState.stakes.filter(s => s.roundsRemaining > 0);
 
     // Add rewards
     if (totalRewards > 0) {
         gameState.player.capital += totalRewards;
         gameState.totalEarnings += totalRewards;
-        addEvent(`Round rewards: $${totalRewards.toFixed(2)}`);
+        addEvent(`Round rewards from vault deposits: $${totalRewards.toFixed(2)}`);
     } else if (totalRewards < 0) {
-        // If penalties were greater than rewards
-        gameState.player.capital += totalRewards; // This will subtract from capital
+        gameState.player.capital += totalRewards;
         gameState.totalEarnings += totalRewards;
         addEvent(`Round resulted in a net loss of $${(-totalRewards).toFixed(2)} due to penalties.`);
     }
 
-    return completedStakes.length > 0;
+    return false;
 }
 
 // LEGO BLOCK 8: Game Control (State Machine Controller)
 function startRound() {
-    if (gameState.stakes.length === 0) {
-        addEvent('No active stakes! Place some stakes first.');
+    if (gameState.deposits.length === 0) {
+        addEvent('No active deposits! Place some deposits in vaults first.');
         return;
     }
 
     // Prevent double-clicks (User experience pattern)
     elements.startRoundBtn.disabled = true;
 
-    const hasCompletions = processRound();
+    updateNetworkDelegations(); // <-- RUN DELEGATOR LOGIC
+    processRound();
     gameState.round++;
 
     // Check game over condition
@@ -301,7 +352,8 @@ function startRound() {
 
     updateUI(); // Data flow: State → UI
     updateOperatorDashboard(); // Update operator stats each round
-    addEvent(`Round ${gameState.round - 1} completed. ${hasCompletions ? 'Some stakes have been returned!' : 'Continue staking to maximize returns!'}`);
+    renderVaults(); // Re-render vaults to show updated TVL and other stats
+    addEvent(`Round ${gameState.round - 1} completed.`);
 
     // Re-enable button after a short delay
     setTimeout(() => {
@@ -381,9 +433,9 @@ window.addEventListener('click', (event) => {
 
 // LEGO BLOCK 11: Game Initialization (Setup Routine)
 function initGame() {
-    renderNetworks(); // Build UI from data
+    renderVaults(); // Build UI from data
     updateUI();       // Set initial UI state
-    addEvent('Welcome to Staking Master! Start with $10,000 and grow your capital through strategic staking.');
+    addEvent('Welcome to Staking Master! Select a vault to deposit your capital.');
 }
 
 // Start the game when page loads
