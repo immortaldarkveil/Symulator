@@ -7,8 +7,8 @@
 
 body {
     font-family: Arial, sans-serif;
-    background: #1a1a2e;
-    color: #eee;
+    background: black; /* Changed to black */
+    color: white; /* Changed to white */
     padding: 20px;
 }
 
@@ -16,7 +16,7 @@ body {
 .header {
     text-align: center;
     margin-bottom: 30px;
-    background: #16213e;
+    background: #333; /* Dark gray for contrast */
     padding: 20px;
     border-radius: 10px;
 }
@@ -29,7 +29,7 @@ body {
 }
 
 .stat {
-    background: #0f3460;
+    background: #333; /* Dark gray */
     padding: 10px 20px;
     border-radius: 5px;
 }
@@ -48,8 +48,8 @@ body {
 }
 
 .network-card {
-    background: #16213e;
-    border: 2px solid #e94560;
+    background: #333; /* Dark gray */
+    border: 2px solid #C0FD5C; /* Changed to #C0FD5C */
     border-radius: 10px;
     padding: 20px;
     cursor: pointer;
@@ -68,15 +68,15 @@ body {
 
 /* Risk level colors */
 .risk-high {
-    color: #e94560;
+    color: #FF6666; /* More standard red */
 }
 
 .risk-medium {
-    color: #f39c12;
+    color: #FFCC00; /* More standard yellow */
 }
 
 .risk-low {
-    color: #27ae60;
+    color: #C0FD5C; /* Primary green */
 }
 
 /* Control buttons */
@@ -86,8 +86,8 @@ body {
 }
 
 .btn {
-    background: #e94560;
-    color: white;
+    background: #C0FD5C; /* Changed to #C0FD5C */
+    color: black; /* Changed to black for contrast */
     border: none;
     padding: 15px 30px;
     border-radius: 5px;
@@ -98,7 +98,7 @@ body {
 }
 
 .btn:hover {
-    background: #c23651;
+    background: #99CC44; /* Slightly darker green for hover */
 }
 
 .btn:disabled {
@@ -119,7 +119,7 @@ body {
 }
 
 .modal-content {
-    background: #16213e;
+    background: #333; /* Dark gray */
     margin: 10% auto;
     padding: 30px;
     border-radius: 10px;
@@ -146,8 +146,8 @@ body {
     padding: 10px;
     margin: 15px 0;
     border-radius: 5px;
-    border: 1px solid #e94560;
-    background: #0f3460;
+    border: 1px solid #C0FD5C; /* Changed to #C0FD5C */
+    background: #555; /* Lighter gray for input */
     color: white;
     font-size: 16px;
 }
@@ -160,20 +160,20 @@ body {
 
 .events-log h3 {
     margin-bottom: 15px;
-    color: #e94560;
+    color: #C0FD5C; /* Changed to #C0FD5C */
 }
 
 #eventsLog {
     max-height: 200px;
     overflow-y: auto;
-    background: #16213e;
+    background: #333; /* Dark gray */
     padding: 15px;
     border-radius: 5px;
 }
 
 .event {
     padding: 8px 0;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid #555; /* Lighter separator */
 }
 
 .event:last-child {

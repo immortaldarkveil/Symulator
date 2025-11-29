@@ -9,7 +9,7 @@
 <body>
     <!-- Header: Single Source of Truth Display -->
     <div class="header">
-        <h1>🔗 Staking Master</h1>
+        <h1>Staking Master</h1>
         <div class="game-stats">
             <div class="stat">
                 <span class="label">Capital:</span>
@@ -40,7 +40,7 @@
 
         <!-- Operator Dashboard: Hidden by default -->
         <div id="operatorDashboard" class="operator-dashboard" style="display: none;">
-            <h3>⭐ Operator Dashboard</h3>
+            <h3>Operator Dashboard</h3>
             <div class="operator-stats">
                 <div class="stat">
                     <span class="label">Name:</span>
@@ -58,6 +58,14 @@
                     <span class="label">Liveness:</span>
                     <span id="opLiveness"></span>%
                 </div>
+            </div>
+        </div>
+
+        <!-- Task Board: Hidden by default -->
+        <div id="taskBoard" class="task-board" style="display: none;">
+            <h3>Available Operator Tasks</h3>
+            <div id="taskList">
+                <!-- Tasks will be dynamically inserted here -->
             </div>
         </div>
     </div>
