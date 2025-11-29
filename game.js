@@ -366,43 +366,44 @@ function processRound() {
         const vault = gameState.vaults.find(v => v.id === deposit.vaultId);
         if (!vault) return;
 
-        const underlyingNetworkIds = vault.type === 'Curated' 
-            ? ['ethereum', 'chainlink']
-            : ['solana', 'avalanche'];
-
         let vaultReward = 0;
-        underlyingNetworkIds.forEach(networkId => {
-            const network = gameState.networks.find(n => n.id === networkId);
-            if (!network) return;
+        // Iterate through the vault's delegation strategy
+        if (vault.delegationStrategy && vault.delegationStrategy.length > 0) {
+            vault.delegationStrategy.forEach(delegation => {
+                const network = gameState.networks.find(n => n.id === delegation.networkId);
+                if (!network) return;
 
-            // --- Final Points 2.1 Logic ---
-            let miningRate = 1.0;
-            if (network.currentStake > network.targetStake) {
-                miningRate = network.targetStake / network.currentStake;
-            }
-            let restakingScore = 1.0;
-            if (vault.restakingRatio > 3) {
-                restakingScore = 3 / vault.restakingRatio;
-            }
-            const securityRate = ((restakingScore * 2) + network.decentralizationScore) / 3;
-            const pointsRate = miningRate * securityRate;
-            const gameBalanceFactor = 0.1;
-            const portionedAmount = deposit.amount / underlyingNetworkIds.length;
-            const baseReward = portionedAmount * pointsRate * gameBalanceFactor;
-            let finalReward = baseReward;
-
-            const safetyMargin = network.trustScore / 100;
-            if (Math.random() > safetyMargin) {
-                const penaltySeverity = (100 - network.trustScore) / 100;
-                const penaltyMultiplier = 1 - (Math.random() * penaltySeverity * 5);
-                finalReward *= penaltyMultiplier;
-                if (penaltyMultiplier < 1) {
-                    const penaltyPercent = Math.round((1 - penaltyMultiplier) * 100);
-                    addEvent(`Slashing event in ${vault.name} via ${network.name}! A ${penaltyPercent}% penalty was applied.`);
+                // --- Final Points 2.1 Logic ---
+                let miningRate = 1.0;
+                if (network.currentStake > network.targetStake) {
+                    miningRate = network.targetStake / network.currentStake;
                 }
-            }
-            vaultReward += finalReward;
-        });
+                let restakingScore = 1.0;
+                if (vault.restakingRatio > 3) {
+                    restakingScore = 3 / vault.restakingRatio;
+                }
+                const securityRate = ((restakingScore * 2) + network.decentralizationScore) / 3;
+                const pointsRate = miningRate * securityRate;
+                const gameBalanceFactor = 0.1;
+                
+                // Portion of deposit allocated to this network based on strategy
+                const portionedAmount = deposit.amount * delegation.allocation;
+                const baseReward = portionedAmount * pointsRate * gameBalanceFactor;
+                let finalReward = baseReward;
+
+                const safetyMargin = network.trustScore / 100;
+                if (Math.random() > safetyMargin) {
+                    const penaltySeverity = (100 - network.trustScore) / 100;
+                    const penaltyMultiplier = 1 - (Math.random() * penaltySeverity * 5);
+                    finalReward *= penaltyMultiplier;
+                    if (penaltyMultiplier < 1) {
+                        const penaltyPercent = Math.round((1 - penaltyMultiplier) * 100);
+                        addEvent(`Slashing event in ${vault.name} via ${network.name}! A ${penaltyPercent}% penalty was applied.`);
+                    }
+                }
+                vaultReward += finalReward;
+            });
+        }
         totalRewards += vaultReward;
     });
 
