@@ -46,7 +46,9 @@ const gameState = {
             apy: 0.08,
             targetStake: 20000,
             currentStake: 0,
-            decentralizationScore: 0.9 // Higher is better
+            decentralizationScore: 0.9, // Higher is better
+            minOperatorTrustScore: 0, // No minimum for Ethereum
+            minDecentralizationScore: 0 // No minimum for Ethereum
         },
         {
             id: 'polygon',
@@ -55,7 +57,9 @@ const gameState = {
             apy: 0.05,
             targetStake: 15000,
             currentStake: 0,
-            decentralizationScore: 0.8
+            decentralizationScore: 0.8,
+            minOperatorTrustScore: 70, // Operators need at least 70 trust to stake here
+            minDecentralizationScore: 0.5
         },
         {
             id: 'avalanche',
@@ -64,7 +68,9 @@ const gameState = {
             apy: 0.12,
             targetStake: 10000,
             currentStake: 0,
-            decentralizationScore: 0.6
+            decentralizationScore: 0.6,
+            minOperatorTrustScore: 60,
+            minDecentralizationScore: 0.4
         },
         {
             id: 'arbitrum',
@@ -73,7 +79,9 @@ const gameState = {
             apy: 0.07,
             targetStake: 12000,
             currentStake: 0,
-            decentralizationScore: 0.7
+            decentralizationScore: 0.7,
+            minOperatorTrustScore: 75,
+            minDecentralizationScore: 0.6
         },
         {
             id: 'solana',
@@ -82,7 +90,9 @@ const gameState = {
             apy: 0.15,
             targetStake: 8000,
             currentStake: 0,
-            decentralizationScore: 0.5
+            decentralizationScore: 0.5,
+            minOperatorTrustScore: 50,
+            minDecentralizationScore: 0.3
         },
         {
             id: 'chainlink',
@@ -91,7 +101,9 @@ const gameState = {
             apy: 0.06,
             targetStake: 18000,
             currentStake: 0,
-            decentralizationScore: 0.95
+            decentralizationScore: 0.95,
+            minOperatorTrustScore: 80,
+            minDecentralizationScore: 0.7
         }
     ]
 };
@@ -173,16 +185,46 @@ function getRiskCategory(trustScore) {
     return 'high';
 }
 
+function getRestakingRiskCategory(ratio) {
+    if (ratio <= 2) return 'low';
+    if (ratio <= 4) return 'medium';
+    return 'high';
+}
+
+// Helper function to calculate estimated APY for a vault
+function calculateEstimatedAPY(vault) {
+    let estimatedApy = 0;
+    if (vault.delegationStrategy && vault.delegationStrategy.length > 0) {
+        vault.delegationStrategy.forEach(delegation => {
+            const network = gameState.networks.find(n => n.id === delegation.networkId);
+            if (network) {
+                estimatedApy += network.apy * delegation.allocation;
+            }
+        });
+    }
+    return estimatedApy;
+}
+
 // LEGO BLOCK 3: Vault Card Factory (Pattern Reuse)
 function renderVaults() {
     // Single innerHTML call = More efficient than multiple DOM operations
     elements.networksGrid.innerHTML = gameState.vaults.map(vault => {
+        const estimatedApy = calculateEstimatedAPY(vault);
+        const delegationSummary = vault.delegationStrategy.map(d => {
+            const network = gameState.networks.find(n => n.id === d.networkId);
+            return `${network ? network.name.split(' ')[0] : 'Unknown'} (${d.allocation * 100}%)`;
+        }).join(', ');
+        const riskCategory = getRestakingRiskCategory(vault.restakingRatio);
+
         return `
         <div class="network-card" onclick="openDepositModal('${vault.id}')">
             <div class="network-name">${vault.name}</div>
             <div>Type: <span class="risk-${vault.type === 'Curated' ? 'low' : 'high'}">${vault.type}</span></div>
             <div>TVL: $${vault.tvl.toLocaleString()}</div>
+            <div>Restaking Ratio: <span class="risk-${riskCategory}">${vault.restakingRatio}x</span></div>
             <div style="margin-top: 10px; font-size: 14px; opacity: 0.8;">${vault.description}</div>
+            <div style="margin-top: 10px; font-size: 14px;"><strong>Delegates to:</strong> ${delegationSummary}</div>
+            <div style="margin-top: 5px; font-size: 14px;"><strong>Estimated APY:</strong> ${(estimatedApy * 100).toFixed(2)}%</div>
         </div>
     `}).join('');
 }
@@ -205,12 +247,36 @@ function addEvent(message) {
 function openDepositModal(vaultId) {
     const vault = gameState.vaults.find(v => v.id === vaultId);
     const existingDeposit = gameState.deposits.find(d => d.vaultId === vaultId);
+    const estimatedApy = calculateEstimatedAPY(vault);
+    const delegationSummary = vault.delegationStrategy.map(d => {
+        const network = gameState.networks.find(n => n.id === d.networkId);
+        return `${network ? network.name : 'Unknown'}: ${d.allocation * 100}%`;
+    }).join('<br>&nbsp;&nbsp;');
+    const riskCategory = getRestakingRiskCategory(vault.restakingRatio);
 
-    const underlyingNetworkIds = vault.type === 'Curated' 
-        ? ['ethereum', 'chainlink']
-        : ['solana', 'avalanche'];
-    const networkDetails = underlyingNetworkIds.map(id => {
-        const network = gameState.networks.find(n => n.id === id);
+    let stakeGateMessage = '';
+    let canDeposit = true;
+
+    if (gameState.player.isOperator) {
+        const operatorProfile = gameState.operators.find(op => op.id === gameState.player.operatorId);
+        if (operatorProfile) {
+            // Check minOperatorTrustScore for each network in the vault's delegation strategy
+            vault.delegationStrategy.forEach(delegation => {
+                const network = gameState.networks.find(n => n.id === delegation.networkId);
+                if (network && network.minOperatorTrustScore && operatorProfile.trustScore < network.minOperatorTrustScore) {
+                    stakeGateMessage += `<div class="risk-high">Your operator trust score (${operatorProfile.trustScore.toFixed(0)}) is too low for ${network.name} (min: ${network.minOperatorTrustScore}).</div>`;
+                    canDeposit = false;
+                }
+                if (network && network.minDecentralizationScore && network.decentralizationScore < network.minDecentralizationScore) {
+                    stakeGateMessage += `<div class="risk-high">${network.name} requires higher decentralization (${network.decentralizationScore * 100}% / min: ${network.minDecentralizationScore * 100}%).</div>`;
+                    canDeposit = false;
+                }
+            });
+        }
+    }
+
+    const networkDetails = vault.delegationStrategy.map(delegation => {
+        const network = gameState.networks.find(n => n.id === delegation.networkId);
         const isOverStaked = network.currentStake > network.targetStake;
         return `
             <div style="padding-left: 10px; margin-bottom: 5px; font-size: 14px;">
@@ -227,22 +293,28 @@ function openDepositModal(vaultId) {
         <div style="margin-bottom: 15px;">
             <div>Type: ${vault.type}</div>
             <div>TVL: $${vault.tvl.toLocaleString()}</div>
-            <div>Restaking Ratio: ${vault.restakingRatio}x ${vault.restakingRatio > 3 ? `<span class="risk-high" style="font-size: 12px; padding: 2px 4px; border-radius: 3px;">HIGH RISK</span>` : ''}</div>
+            <div>Restaking Ratio: <span class="risk-${riskCategory}">${vault.restakingRatio}x</span></div>
+            <div style="margin-top: 5px;"><strong>Estimated APY:</strong> ${(estimatedApy * 100).toFixed(2)}%</div>
+        </div>
+        <div style="margin-bottom: 15px;">
+            <strong>Delegation Strategy:</strong><br>
+            &nbsp;&nbsp;${delegationSummary}
         </div>
         <div style="margin-bottom: 15px;">
             <strong>Underlying Network Status:</strong>
             ${networkDetails}
         </div>
+        ${stakeGateMessage ? `<div style="margin-bottom: 15px;"><strong>Stake Gate Requirements:</strong>${stakeGateMessage}</div>` : ''}
         ${existingDeposit ? `
             <div style="background: #0f3460; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
                 <strong>Your Current Deposit:</strong> $${existingDeposit.amount.toLocaleString()}
             </div>
         ` : ''}
-        <input type="number" id="depositAmount" class="stake-input" placeholder="Enter amount to deposit ($)" max="${gameState.player.capital}" min="1">
+        <input type="number" id="depositAmount" class="stake-input" placeholder="Enter amount to deposit ($)" max="${gameState.player.capital}" min="1" ${!canDeposit ? 'disabled' : ''}>
         <div style="margin-top: 15px;">
             <strong>Available Capital:</strong> $${gameState.player.capital.toLocaleString()}
         </div>
-        <button onclick="makeDeposit('${vaultId}')" class="btn" style="margin-top: 15px; width: 100%;">
+        <button onclick="makeDeposit('${vaultId}')" class="btn" style="margin-top: 15px; width: 100%;" ${!canDeposit ? 'disabled' : ''}>
             ${existingDeposit ? 'Add to Deposit' : 'Make Deposit'}
         </button>
     `;
@@ -302,6 +374,7 @@ function acceptTask(taskId) {
 
     // Move task from available to accepted
     const task = gameState.availableTasks.splice(taskIndex, 1)[0];
+    task.status = 'accepted'; // Add status to the task
     operatorProfile.acceptedTasks.push(task);
 
     addEvent(`Accepted task: ${task.description}`);
@@ -315,8 +388,13 @@ function generateTasks() {
     gameState.availableTasks = []; // Clear old tasks
     
     gameState.networks.forEach(network => {
-        // Each network has a chance to generate a task each round
-        if (Math.random() < 0.4) { // 40% chance
+        // Chance to generate a task is inversely proportional to trustScore (lower trust = more tasks)
+        // And also influenced by the number of active operators
+        const activeOperators = gameState.operators.filter(op => op.liveness > 0).length;
+        const baseChance = 0.2 + (100 - network.trustScore) / 200; // 0.2 to 0.7
+        const finalChance = Math.min(0.8, baseChance * (1 + activeOperators * 0.1)); // Cap at 80%
+
+        if (Math.random() < finalChance) {
             const reward = 50 + Math.round(Math.random() * 100);
             const trustPenalty = 1 + Math.round(Math.random() * 4);
             const newTask = {
@@ -359,9 +437,28 @@ function updateNetworkDelegations() {
 
 // LEGO BLOCK 7: Round Processing (State Machine) - FINAL VERSION
 function processRound() {
+    // 1. Update Operator Liveness & Trust Score
+    if (gameState.player.isOperator) {
+        gameState.operators.forEach(op => {
+            // Liveness decay
+            const livenessDecrease = Math.random() * 0.5; // Decrease by 0 to 0.5
+            op.liveness = Math.max(0, op.liveness - livenessDecrease);
+
+            // Trust score decay/gain based on liveness
+            if (op.liveness < 80) {
+                const trustDecay = (80 - op.liveness) / 100;
+                op.trustScore = Math.max(0, op.trustScore - trustDecay);
+                addEvent(`Your operator's trust score is decaying due to low liveness!`);
+            } else if (op.liveness > 95) {
+                const trustGain = (op.liveness - 95) / 100;
+                op.trustScore = Math.min(100, op.trustScore + trustGain);
+            }
+        });
+    }
+
     let totalRewards = 0;
 
-    // 1. Process Staking Rewards from Deposits
+    // 2. Process Staking Rewards from Deposits
     gameState.deposits.forEach(deposit => {
         const vault = gameState.vaults.find(v => v.id === deposit.vaultId);
         if (!vault) return;
@@ -407,24 +504,31 @@ function processRound() {
         totalRewards += vaultReward;
     });
 
-    // 2. Process Operator Task Rewards
+    // 3. Process Operator Task Rewards
     if (gameState.player.isOperator) {
         const operatorProfile = gameState.operators.find(op => op.id === gameState.player.operatorId);
         if (operatorProfile && operatorProfile.acceptedTasks.length > 0) {
             let taskRewards = 0;
             operatorProfile.acceptedTasks.forEach(task => {
-                taskRewards += task.reward;
-                operatorProfile.tasksCompleted++;
-                // Small trust score increase for completing tasks
-                operatorProfile.trustScore = Math.min(100, operatorProfile.trustScore + 0.5);
-                addEvent(`✅ Task completed for ${task.networkName}. Reward: $${task.reward}.`);
+                const failureChance = Math.max(0, (90 - operatorProfile.liveness) / 100);
+                if (Math.random() < failureChance) {
+                    // Task failed
+                    operatorProfile.trustScore = Math.max(0, operatorProfile.trustScore - task.trustPenalty);
+                    addEvent(`❌ Task failed for ${task.networkName} due to low liveness! Trust score penalized by ${task.trustPenalty}.`);
+                } else {
+                    // Task succeeded
+                    taskRewards += task.reward;
+                    operatorProfile.tasksCompleted++;
+                    operatorProfile.trustScore = Math.min(100, operatorProfile.trustScore + 0.5);
+                    addEvent(`✅ Task completed for ${task.networkName}. Reward: $${task.reward}.`);
+                }
             });
             totalRewards += taskRewards;
             operatorProfile.acceptedTasks = []; // Clear tasks for next round
         }
     }
 
-    // 3. Add all rewards to capital
+    // 4. Add all rewards to capital
     if (totalRewards > 0) {
         gameState.player.capital += totalRewards;
         gameState.totalEarnings += totalRewards;
@@ -554,7 +658,7 @@ window.addEventListener('click', (event) => {
 function initGame() {
     renderVaults(); // Build UI from data
     updateUI();       // Set initial UI state
-    addEvent('Welcome to Staking Master! Select a vault to deposit your capital.');
+    addEvent('Welcome to SYM-ULATOR! Select a vault to deposit your capital.');
 }
 
 // Start the game when page loads
